@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "575253185128",
+    "firebase_url": "https://watertempok-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "watertempok",
+    "storage_bucket": "watertempok.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:575253185128:android:9db4e1a0c0193fffa671dd",
+        "android_client_info": {
+          "package_name": "com.example.iot_water_level_track"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBLVCfmoBQ5KNtSRE2abnQoVtFRM32hauA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
