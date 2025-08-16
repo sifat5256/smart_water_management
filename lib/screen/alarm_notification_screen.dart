@@ -1,4 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:firebase_database/firebase_database.dart';
+
+import '../service/firebase_service.dart';
+
 
 class AlarmScreen extends StatefulWidget {
   const AlarmScreen({super.key});
@@ -13,40 +19,22 @@ class _AlarmScreenState extends State<AlarmScreen> with TickerProviderStateMixin
   late Animation<double> _slideAnimation;
   late AnimationController _pulseController;
 
-  final List<Map<String, dynamic>> _notifications = [
-    {
-      'type': 'motor',
-      'status': 'on',
-      'message': 'Water motor turned ON',
-      'time': '10:30 AM',
-      'urgent': false,
-    },
-    {
-      'type': 'level',
-      'status': 'low',
-      'message': 'Water level below 20%',
-      'time': 'Yesterday',
-      'urgent': true,
-    },
-    {
-      'type': 'motor',
-      'status': 'off',
-      'message': 'Water motor automatically turned OFF',
-      'time': 'Yesterday',
-      'urgent': false,
-    },
-    {
-      'type': 'alert',
-      'status': 'high',
-      'message': 'Water overflow detected!',
-      'time': 'Mar 15',
-      'urgent': true,
-    },
-  ];
+  late DatabaseReference _alertsRef;
+  late StreamSubscription<DatabaseEvent> _alertsSubscription;
+  List<Map<String, dynamic>> _notifications = [];
+
+  // System status variables
+  bool _pumpStatus = false;
+  int _waterLevel = 0;
+  late StreamSubscription<bool> _pumpSubscription;
+  late StreamSubscription<int> _waterLevelSubscription;
 
   @override
   void initState() {
     super.initState();
+
+    // Initialize Firebase references
+    _alertsRef = FirebaseDatabase.instance.ref('devices/${FirebaseService.deviceId}/alerts');
 
     // Main animation controller
     _mainController = AnimationController(
@@ -73,12 +61,78 @@ class _AlarmScreenState extends State<AlarmScreen> with TickerProviderStateMixin
     );
 
     _mainController.forward();
+
+    // Setup Firebase listeners
+    _setupFirebaseListeners();
+  }
+
+  void _setupFirebaseListeners() {
+    // Listen to alerts
+    _alertsSubscription = _alertsRef.orderByChild('timestamp').onValue.listen((event) {
+      if (event.snapshot.value != null) {
+        final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
+        final List<Map<String, dynamic>> alerts = [];
+
+        data.forEach((key, value) {
+          final alert = Map<String, dynamic>.from(value as Map);
+          alerts.add(alert);
+        });
+
+        // Sort by timestamp (newest first)
+        alerts.sort((a, b) => (b['timestamp'] ?? 0).compareTo(a['timestamp'] ?? 0));
+
+        setState(() {
+          _notifications = alerts.map((alert) {
+            return {
+              'type': alert['type'] ?? 'alert',
+              'status': alert['status'] ?? 'unknown',
+              'message': alert['message'] ?? 'No message',
+              'time': _formatTimestamp(alert['timestamp']),
+              'urgent': alert['urgent'] ?? false,
+            };
+          }).toList();
+        });
+      }
+    });
+
+    // Listen to pump status
+    _pumpSubscription = FirebaseService.getPumpStatus().listen((status) {
+      setState(() {
+        _pumpStatus = status;
+      });
+    });
+
+    // Listen to water level
+    _waterLevelSubscription = FirebaseService.getWaterLevel().listen((level) {
+      setState(() {
+        _waterLevel = level;
+      });
+    });
+  }
+
+  String _formatTimestamp(int? timestamp) {
+    if (timestamp == null) return 'Just now';
+
+    final dateTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inMinutes < 1) return 'Just now';
+    if (difference.inHours < 1) return '${difference.inMinutes} min ago';
+    if (difference.inDays < 1) return '${difference.inHours} hours ago';
+    if (difference.inDays == 1) return 'Yesterday';
+    if (difference.inDays < 7) return '${difference.inDays} days ago';
+
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
   }
 
   @override
   void dispose() {
     _mainController.dispose();
     _pulseController.dispose();
+    _alertsSubscription.cancel();
+    _pumpSubscription.cancel();
+    _waterLevelSubscription.cancel();
     super.dispose();
   }
 
@@ -153,14 +207,14 @@ class _AlarmScreenState extends State<AlarmScreen> with TickerProviderStateMixin
               children: [
                 _buildStatusIndicator(
                   label: 'Motor',
-                  status: 'ON',
-                  isActive: true,
+                  status: _pumpStatus ? 'ON' : 'OFF',
+                  isActive: _pumpStatus,
                   icon: Icons.electric_bolt,
                 ),
                 _buildStatusIndicator(
                   label: 'Water Level',
-                  status: '65%',
-                  isActive: true,
+                  status: '$_waterLevel%',
+                  isActive: _waterLevel > 20,
                   icon: Icons.water_drop,
                 ),
                 _buildStatusIndicator(
@@ -173,9 +227,9 @@ class _AlarmScreenState extends State<AlarmScreen> with TickerProviderStateMixin
             ),
             const SizedBox(height: 12),
             LinearProgressIndicator(
-              value: 0.65,
+              value: _waterLevel / 100,
               backgroundColor: Colors.grey[200],
-              color: const Color(0xFF00A8E8),
+              color: _getWaterLevelColor(_waterLevel),
               minHeight: 8,
               borderRadius: BorderRadius.circular(4),
             ),
@@ -183,6 +237,12 @@ class _AlarmScreenState extends State<AlarmScreen> with TickerProviderStateMixin
         ),
       ),
     );
+  }
+
+  Color _getWaterLevelColor(int level) {
+    if (level < 20) return Colors.red;
+    if (level < 50) return Colors.orange;
+    return const Color(0xFF00A8E8);
   }
 
   Widget _buildStatusIndicator({required String label, required String status, required bool isActive, required IconData icon}) {

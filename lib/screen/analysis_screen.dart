@@ -1,8 +1,12 @@
+import 'dart:async';
+
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'dart:math';
 
+import '../service/firebase_service.dart';
 import 'analysis_screen/widget/time_periodic_slector.dart';
 
 
@@ -18,7 +22,15 @@ class _AnalysisScreenState extends State<AnalysisScreen> with SingleTickerProvid
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _slideAnimation;
+  StreamSubscription<Map<String, dynamic>>? _flow1Subscription;
+  StreamSubscription<Map<String, dynamic>>? _flow2Subscription;
 
+  double flow1TotalLiters = 0;
+  double flow2TotalLiters = 0;
+  double flow1TotalBill = 0;
+  double flow2TotalBill = 0;
+  double flow1PricePerLiter = 1.5;
+  double flow2PricePerLiter = 2.0;
   int _selectedTab = 0;
   final List<String> _tabs = ['Daily', 'Weekly', 'Monthly'];
 
@@ -53,8 +65,32 @@ class _AnalysisScreenState extends State<AnalysisScreen> with SingleTickerProvid
 
     _controller.forward();
     _initializeData();
+    _setupFirebaseListeners();
+  }
+  void _setupFirebaseListeners() {
+    _flow1Subscription = FirebaseService.getFlow1Data().listen((data) {
+      setState(() {
+        flow1TotalLiters = data['total_liters'] ?? 0;
+        flow1TotalBill = data['total_bill'] ?? 0;
+        flow1PricePerLiter = data['price_per_liter'] ?? 1.5;
+      });
+    });
+
+    _flow2Subscription = FirebaseService.getFlow2Data().listen((data) {
+      setState(() {
+        flow2TotalLiters = data['total_liters'] ?? 0;
+        flow2TotalBill = data['total_bill'] ?? 0;
+        flow2PricePerLiter = data['price_per_liter'] ?? 2.0;
+      });
+    });
   }
 
+  @override
+  void dispose() {
+    _flow1Subscription?.cancel();
+    _flow2Subscription?.cancel();
+    super.dispose();
+  }
   void _initializeData() {
     final now = DateTime.now();
     _billingCycleStart = DateTime(now.year, now.month, 1);
@@ -128,11 +164,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> with SingleTickerProvid
     });
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -179,16 +211,22 @@ class _AnalysisScreenState extends State<AnalysisScreen> with SingleTickerProvid
                     ),
                     const SizedBox(height: 20),
                     BillingInfoCard(
-                      currentBill: _currentBill,
+                      currentBill: flow1TotalBill + flow2TotalBill,
                       billingCycleStart: _billingCycleStart,
                       daysRemaining: _daysRemaining,
-                      waterRate: _waterRate,
+                      waterRate: flow1PricePerLiter, // or average if needed
                       daysWithUsage: _monthlyUsageData.where((e) => e > 0).length,
+                      flow1TotalBill: flow1TotalBill,
+                      flow2TotalBill: flow2TotalBill,
                     ),
                     const SizedBox(height: 20),
                     FlatUsageComparison(
                       flatData: _flatData,
                       onViewDetails: _showMonthlyDetails,
+                      flow1TotalLiters: flow1TotalLiters,
+                      flow2TotalLiters: flow2TotalLiters,
+                      flow1TotalBill: flow1TotalBill,
+                      flow2TotalBill: flow2TotalBill,
                     ),
                   ],
                 ),

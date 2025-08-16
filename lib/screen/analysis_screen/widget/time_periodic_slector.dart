@@ -60,6 +60,8 @@ class BillingInfoCard extends StatelessWidget {
   final int daysRemaining;
   final double waterRate;
   final int daysWithUsage;
+  final double flow1TotalBill;
+  final double flow2TotalBill;
 
   const BillingInfoCard({
     super.key,
@@ -68,10 +70,14 @@ class BillingInfoCard extends StatelessWidget {
     required this.daysRemaining,
     required this.waterRate,
     required this.daysWithUsage,
+    required this.flow1TotalBill,
+    required this.flow2TotalBill,
   });
 
   @override
   Widget build(BuildContext context) {
+    final totalBill = flow1TotalBill + flow2TotalBill;
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -120,7 +126,7 @@ class BillingInfoCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Current Bill',
+                        'Total Bill',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey,
@@ -128,7 +134,7 @@ class BillingInfoCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '₹${currentBill.toStringAsFixed(2)}',
+                        '₹${totalBill.toStringAsFixed(2)}',
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -152,7 +158,7 @@ class BillingInfoCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Billing Cycle',
+                        'Flow Rates',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey,
@@ -160,20 +166,20 @@ class BillingInfoCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${DateFormat('MMM d').format(billingCycleStart)} - '
-                            '${DateFormat('MMM d, y').format(DateTime(
-                          billingCycleStart.year,
-                          billingCycleStart.month + 1,
-                          billingCycleStart.day,
-                        ))}',
+                        'Flow1: ₹${flow1TotalBill.toStringAsFixed(2)}',
                         style: const TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(height: 8),
                       Text(
-                        'Rate: ₹${waterRate.toStringAsFixed(2)}/L',
+                        'Flow2: ₹${flow2TotalBill.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Rate: ₹$waterRate/L',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],
@@ -222,15 +228,40 @@ class BillingInfoCard extends StatelessWidget {
 class FlatUsageComparison extends StatelessWidget {
   final List<Map<String, dynamic>> flatData;
   final Function(List<Map<String, dynamic>>) onViewDetails;
+  final double flow1TotalLiters;
+  final double flow2TotalLiters;
+  final double flow1TotalBill;
+  final double flow2TotalBill;
 
   const FlatUsageComparison({
     super.key,
     required this.flatData,
     required this.onViewDetails,
+    required this.flow1TotalLiters,
+    required this.flow2TotalLiters,
+    required this.flow1TotalBill,
+    required this.flow2TotalBill,
   });
 
   @override
   Widget build(BuildContext context) {
+    final flats = [
+      {
+        'name': 'Flow 1',
+        'usage': flow1TotalLiters.round(),
+        'bill': flow1TotalBill,
+        'color': const Color(0xFF00A8E8),
+        'paid': true,
+      },
+      {
+        'name': 'Flow 2',
+        'usage': flow2TotalLiters.round(),
+        'bill': flow2TotalBill,
+        'color': Colors.orange,
+        'paid': true,
+      },
+    ];
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -245,26 +276,15 @@ class FlatUsageComparison extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Monthly Flat Comparison',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.calendar_today, size: 20),
-                  onPressed: () => onViewDetails(flatData),
-                  tooltip: 'View Monthly Details',
-                ),
-              ],
+            Text(
+              'Flow Comparison',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 16),
             Column(
-              children: flatData.map((flat) {
-                final isCurrentUser = flat['name'] == 'Flat 2';
+              children: flats.map((flat) {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Row(
@@ -282,22 +302,13 @@ class FlatUsageComparison extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Text(
-                                  flat['name'] as String,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                    color: isCurrentUser ? const Color(0xFF00A8E8) : Colors.black,
-                                  ),
-                                ),
-                                if (isCurrentUser)
-                                  const Padding(
-                                    padding: EdgeInsets.only(left: 4),
-                                    child: Icon(Icons.person, size: 14, color: Color(0xFF00A8E8)),
-                                  ),
-                              ],
+                            Text(
+                              flat['name'] as String,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                color: flat['color'] as Color,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Row(
@@ -311,26 +322,10 @@ class FlatUsageComparison extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  'Bill: ₹${flat['bill']}',
+                                  'Bill: ₹${(flat['bill'] as double).toStringAsFixed(2)}',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey[600],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: (flat['paid'] as bool) ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    (flat['paid'] as bool) ? 'Paid' : 'Pending',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: (flat['paid'] as bool) ? Colors.green : Colors.red,
-                                      fontWeight: FontWeight.w500,
-                                    ),
                                   ),
                                 ),
                               ],
@@ -357,34 +352,14 @@ class FlatUsageComparison extends StatelessWidget {
             Divider(color: Colors.grey.withOpacity(0.2)),
             const SizedBox(height: 8),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'Your Position',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.emoji_events, color: Colors.blue, size: 16),
-                      SizedBox(width: 4),
-                      Text(
-                        '2nd Rank',
-                        style: TextStyle(
-                          color: Colors.blue,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                  'Total: ₹${(flow1TotalBill + flow2TotalBill).toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
                   ),
                 ),
               ],
