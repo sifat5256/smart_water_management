@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -48,6 +49,17 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _initializeSubscriptions();
+    FirebaseDatabase.instance
+        .ref('devices/${FirebaseService.deviceId}/control')
+        .onValue
+        .listen((event) {
+      final data = event.snapshot.value as Map<dynamic, dynamic>? ?? {};
+      if (mounted) {
+        setState(() {
+          isPumpRunning = data['force_on'] == true;
+        });
+      }
+    });
 
     // Add debug prints to verify data
     FirebaseService.getTemperature().listen((temp) {

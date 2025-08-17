@@ -6,40 +6,112 @@ class FirebaseService {
 
   // Get reference to device data
   static DatabaseReference get _deviceRef => _database.child('devices/$deviceId');
-
-  // Control pump state
   static Future<void> controlPump({required bool turnOn}) async {
     try {
-      if (turnOn) {
-        await _deviceRef.child('control/force_on').set(true);
-        await _deviceRef.child('control/force_off').set(false);
-      } else {
-        await _deviceRef.child('control/force_on').set(false);
-        await _deviceRef.child('control/force_off').set(true);
-      }
+      // Update both force_on and force_off to avoid conflicts
+      await _deviceRef.child('control').update({
+        'force_on': turnOn,
+        'force_off': !turnOn,
+      });
     } catch (e) {
       print('Error controlling pump: $e');
       rethrow;
     }
   }
 
-  // Enable automatic pump control (disable manual override)
+  // Enhanced enableAutoMode method
   static Future<void> enableAutoMode() async {
     try {
-      await _deviceRef.child('control/force_on').set(false);
-      await _deviceRef.child('control/force_off').set(false);
+      await _deviceRef.child('control').update({
+        'force_on': false,
+        'force_off': false,
+      });
     } catch (e) {
       print('Error enabling auto mode: $e');
       rethrow;
     }
   }
-
-  // Listen to pump status changes
   static Stream<bool> getPumpStatus() {
-    return _deviceRef.child('telemetry/pump').onValue.map((event) {
-      return event.snapshot.value as bool? ?? false;
+    return _deviceRef.onValue.map((event) {
+      final data = event.snapshot.value as Map<dynamic, dynamic>? ?? {};
+      final control = data['control'] as Map<dynamic, dynamic>? ?? {};
+      final telemetry = data['telemetry'] as Map<dynamic, dynamic>? ?? {};
+
+      // Priority 1: Manual control flags
+      if (control['force_on'] == true) return true;
+      if (control['force_off'] == true) return false;
+
+      // Priority 2: Telemetry pump state (actual pump state)
+      if (telemetry['pump'] != null) {
+        return telemetry['pump'] as bool;
+      }
+
+      // Default fallback
+      return false;
     });
   }
+
+  // Enhanced pump status listener
+  // static Stream<bool> getPumpStatus() {
+  //   return _deviceRef.child('control').onValue.map((event) {
+  //     final data = event.snapshot.value as Map<dynamic, dynamic>? ?? {};
+  //
+  //     // Prioritize force_on/force_off over telemetry
+  //     if (data['force_on'] == true) return true;
+  //     if (data['force_off'] == true) return false;
+  //
+  //     // Fallback to telemetry if no control commands
+  //     final telemetry = (event.snapshot.parent?.child('telemetry/pump').value as bool?) ?? false;
+  //     return telemetry;
+  //   });
+  // }
+  // Control pump state
+  // static Future<void> controlPump({required bool turnOn}) async {
+  //   try {
+  //     if (turnOn) {
+  //       await _deviceRef.child('control/force_on').set(true);
+  //       await _deviceRef.child('control/force_off').set(false);
+  //     } else {
+  //       await _deviceRef.child('control/force_on').set(false);
+  //       await _deviceRef.child('control/force_off').set(true);
+  //     }
+  //   } catch (e) {
+  //     print('Error controlling pump: $e');
+  //     rethrow;
+  //   }
+  // }
+
+  // Enable automatic pump control (disable manual override)
+  // static Future<void> enableAutoMode() async {
+  //   try {
+  //     await _deviceRef.child('control/force_on').set(false);
+  //     await _deviceRef.child('control/force_off').set(false);
+  //   } catch (e) {
+  //     print('Error enabling auto mode: $e');
+  //     rethrow;
+  //   }
+  // }
+
+  // Listen to pump status changes
+  // static Stream<bool> getPumpStatus() {
+  //   return _deviceRef.onValue.map((event) {
+  //     final data = event.snapshot.value as Map<dynamic, dynamic>? ?? {};
+  //     final telemetry = data['telemetry'] as Map? ?? {};
+  //     final control = data['control'] as Map? ?? {};
+  //
+  //     // Prefer telemetry if ESP32 reports it
+  //     if (telemetry['pump'] != null) {
+  //       return telemetry['pump'] as bool? ?? false;
+  //     }
+  //
+  //     // Fallback: deduce from control flags
+  //     if (control['force_on'] == true) return true;
+  //     if (control['force_off'] == true) return false;
+  //
+  //     return false;
+  //   });
+  // }
+
 
   // Listen to water level changes
   static Stream<int> getWaterLevel() {
